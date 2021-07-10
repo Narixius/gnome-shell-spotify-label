@@ -73,6 +73,7 @@ const SpotifyLabel = new Lang.Class({
     children = Main.panel._leftBox.get_children();
     Main.panel._leftBox.insert_child_at_index(this.actor, children.length);
 
+    this.nextPrevButtonsVisible(false);
     this._refresh();
   },
   initNextPrevButtons() {
@@ -151,14 +152,20 @@ const SpotifyLabel = new Lang.Class({
         'px; '
     );
   },
-
-  _nextPrevButtonsDisplayChanged: function () {
-    if (this.settings.get_boolean('show-next-prev-buttons')) {
+  nextPrevButtonsVisible(isVisible) {
+    if (isVisible) {
       this.prevButton.show();
       this.nextButton.show();
     } else {
       this.prevButton.hide();
       this.nextButton.hide();
+    }
+  },
+  _nextPrevButtonsDisplayChanged: function () {
+    if (this.settings.get_boolean('show-next-prev-buttons')) {
+      this.nextPrevButtonsVisible(true);
+    } else {
+      this.nextPrevButtonsVisible(false);
     }
     this._refresh();
   },
@@ -230,6 +237,11 @@ const SpotifyLabel = new Lang.Class({
         // if this extension muted spotify, unmute it.
         if (this.extentionMutedSpotify) this.unMuteSpotify();
       }
+      this.buttonText.show();
+      this.nextPrevButtonsVisible(true);
+    } else {
+      this.buttonText.hide();
+      this.nextPrevButtonsVisible(false);
     }
     this.buttonText.set_label(txt);
   },
@@ -237,16 +249,19 @@ const SpotifyLabel = new Lang.Class({
   findSpotifyAppId() {
     const findId = (string) => {
       const splited = string.split('index:');
+      let spotifyIDs = [];
       for (let index of splited) {
         let id = parseInt(index.substring(0, index.indexOf('driver')));
-        if (index.indexOf('Spotify') !== -1) return id;
+        if (index.indexOf('Spotify') !== -1) spotifyIDs.push(id + '');
       }
+      return spotifyIDs;
     };
+
     try {
       [res, out, err, status] = GLib.spawn_command_line_sync(
         'pacmd list-sink-inputs'
       );
-      return findId(out + '');
+      return findId(out);
     } catch (err) {
       return NaN;
     }
@@ -273,10 +288,10 @@ const SpotifyLabel = new Lang.Class({
   },
   muteSpotify() {
     try {
-      let spotifyId = this.findSpotifyAppId();
-      if (spotifyId != NaN) {
+      let spotifyIDs = this.findSpotifyAppId();
+      for (spotifyID of spotifyIDs) {
         GLib.spawn_command_line_sync(
-          `pacmd set-sink-input-mute ${spotifyId} true`
+          `pacmd set-sink-input-mute ${spotifyID} true`
         );
         this.extentionMutedSpotify = true;
         return true;
@@ -288,10 +303,10 @@ const SpotifyLabel = new Lang.Class({
   },
   unMuteSpotify() {
     try {
-      let spotifyId = this.findSpotifyAppId();
-      if (spotifyId != NaN) {
+      let spotifyIDs = this.findSpotifyAppId();
+      for (spotifyID of spotifyIDs) {
         GLib.spawn_command_line_sync(
-          `pacmd set-sink-input-mute ${spotifyId} false`
+          `pacmd set-sink-input-mute ${spotifyID} false`
         );
         this.extentionMutedSpotify = false;
         return true;
